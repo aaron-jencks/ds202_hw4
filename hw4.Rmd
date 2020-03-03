@@ -2,6 +2,7 @@
 knitr::opts_chunk$set(echo = TRUE)
 library('datasets')
 library(dplyr)
+library(ggplot2)
 cw = ChickWeight
 ```
 
@@ -39,12 +40,97 @@ For all of the questions use `dplyr` functions with the pipe `%>%` whenever poss
 4. In the complete data set introduce a new variable that measures the current weight difference compared to day 0. Name this variable  `weightgain` and print the first 3 rows of the new data frame.
 
 	```{r}
-	
+	weight_init = cw %>% filter(Time == 0) %>% arrange(Chick)
+	cw = cw %>%
+	     mutate(weightgain = weight - weight_init[Chick, "weight"])
+	head(cw, 3)
 	```
 
 5. Use `{ggplot2}` to create side-by-side boxplots of `weightgain` by `Diet` for day 21. Change the order of the categories in the Diet variable such that the boxplots are ordered by median `weightgain`, and the lower limit of the y axis should be 0. Describe the relationship in 2-3 sentences. 
+
+	```{r}
+	medians = cw %>% group_by(Diet) %>% summarize(median = median(weightgain)) %>% arrange(median)
+
+	print(medians)
+	print(levels(factor(c(medians["Diet"]))))
+#	diets = ordered(cw$Diet, levels=c(medians["Diet"]))
+#	print(diets)
+
+#	cw$Diet = reorder(cw$Diet, levels(factor(c(medians["Diet"]))))
+
+	cw %>% 
+	filter(Time == 21) %>%
+	mutate(weightmedian = medians[Diet, "median"]$median) %>%
+	arrange(weightmedian, Chick) %>%
+	ggplot(aes(x=Diet, y=weightgain)) + geom_boxplot() + ylim(0, NA)
+	```
+
+	From looking at this data, I can conclude a couple of things. The weight gain of the chicks seems to increase in a direct correlation with the number of the diet that they are on, except for 4. The diet with the highest weight gain is diet 3. Diets one and four seem to have lagging distributions, while diets two and three seem to have pretty normal distributions.
+
 6. Answer each of the following questions using numerical and graphical summary. Also explain what you found: (a) Which chick gained the most weight and which gained the least weight? (b) What diets were they on?
-7. For the chicks with the least and the most weight at time 0, plot their growth trajectories over time. </br>
+
+	**Part a:**
+
+	To see which chicks have the most extreme weights we can simply call the corresponding methods for each:
+
+	```{r}
+	mx = max(cw$weightgain)
+	mn = min(cw$weightgain)
+
+	print(cat("Max weight gain is:", mx, fill=TRUE))
+	print(cat("Min weight gain is:", mn, fill=TRUE))
+	```
+
+	As we can see here, the chick that gained the most weight gained 332, and the chick that gained the least amount of weight, actually lost 4. To see which chicks they are, we can use `select`
+
+	```{r}
+	extremes = cw %>% filter(weightgain == mx | weightgain == mn)
+	print(extremes)
+	```
+
+	And now we can see that the chicks that lost weight are chicks 3, and 18, and the chick that gained the most weight is chick 35.
+
+	**Part b:**
+
+	For the analysis for this part I'll refer you to my solution for *Part a* above. The diets are as follows, the two chicks that lost weight were on diet 1, and the chick that gained the most weight was on diet 3.
+
+	And because you asked for a graphic
+
+	```{r}
+	ggplot(extremes, aes(x=Time, y=weightgain, color=Diet, label=Chick)) + geom_point() + geom_text(position='jitter', width=0.1, height=0.1)
+	```
+
+7. For the chicks with the least and the most weight at time 0, plot their growth trajectories over time.
+
+	```{r}
+	time0 = cw %>% filter(Time == 0)
+
+	mx = max(time0$weight)
+	mn = min(time0$weight)
+
+	extremes = time0 %>% filter(weight == mx | weight == mn)
+
+	chicks = c(extremes["Chick"]$Chick)
+
+	extremes = cw %>% filter(Chick %in% chicks) %>% group_by(Chick) %>% arrange(Chick)
+
+	plot = ggplot(extremes, aes(x=Time, y=weight, color=Chick)) + geom_point() + facet_wrap(~Chick)
+
+	i = 1
+	repeat {
+
+		chick = chicks[i]
+		extremes = cw %>% filter(Chick == chick)
+		plot = plot + stat_smooth(data=extremes, method='lm', aes(x=Time, y=weight, color=Chick), se=F)
+
+		i = i + 1
+		if(i >= length(chicks)) { break }
+	}
+
+	plot
+
+	```
+
 8. Add to the previous plot the average growth trajectory for all chicks (calculated as the mean weight for each chick at each time). How do the trajectories compare?
 9. What else do you find interesting in the dataset? Show your exploratory analysis.
 
