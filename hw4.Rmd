@@ -17,7 +17,7 @@ For all of the questions use `dplyr` functions with the pipe `%>%` whenever poss
 <!-- 5 pts of extra credit: construct a ggplot that shows average weights by diet with an interval (shown as a line) of +- the standard deviation around the averages. -->
 
 	```{r}
-	head(cw, 30)
+#	head(cw, 30)
 	weight0 = cw %>% 
 		  filter(Time == 0) %>% 
 		  group_by(Diet) %>%
@@ -42,8 +42,8 @@ For all of the questions use `dplyr` functions with the pipe `%>%` whenever poss
 	```{r}
 	weight_init = cw %>% filter(Time == 0) %>% arrange(Chick)
 	cw = cw %>%
-	     mutate(weightgain = weight - weight_init[Chick, "weight"]) %>%
-	     mutate(weight0 = weight_init$weight[Chick])
+	     mutate(weightgain = weight - weight_init[Chick, "weight"])
+
 	head(cw, 3)
 	```
 
@@ -52,7 +52,7 @@ For all of the questions use `dplyr` functions with the pipe `%>%` whenever poss
 	```{r}
 	medians = cw %>% group_by(Diet) %>% summarize(median = median(weightgain)) %>% arrange(desc(median))
 
-	print(medians)
+#	print(medians)
 #	print(levels(factor(c(medians["Diet"]))))
 #	diets = ordered(cw$Diet, levels=c(medians["Diet"]))
 #	print(diets)
@@ -111,10 +111,10 @@ For all of the questions use `dplyr` functions with the pipe `%>%` whenever poss
 
 	chicks = unique(extremes$Chick)
 
-	gextremes = cw %>% filter(Chick %in% chicks) %>% arrange(Chick) # group_by(Chick) %>% arrange(Chick)
-	print(gextremes)
+	gextremes = cw %>% filter(Chick %in% chicks) %>% arrange(Chick) %>% mutate(weight0 = weight_init$weight[Chick], filtered_chicks = Chick) # group_by(Chick) %>% arrange(Chick)
+#	print(gextremes)
 
-	ggplot(gextremes, aes(x=Time, y=weight, color=Chick)) + geom_point() + facet_wrap(~Chick) + geom_smooth(method='lm')
+	ggplot(gextremes, aes(x=Time, y=weight, color=Chick)) + geom_point() + facet_wrap(~filtered_chicks) + geom_smooth(method='lm')
 
 #	i = 1
 #	repeat {
@@ -129,11 +129,13 @@ For all of the questions use `dplyr` functions with the pipe `%>%` whenever poss
 
 	```
 
+	There are a few trajectories that are pretty similar to the trendline of the chick that was plotted, those are 11, 3, 23, 27, 28, and 36. But some of those don't really make any sense, like 3, is a sine wave, so the trendline is wildly inaccurate. The rest of them are pretty close though, overall, 60% of the chicks follow the growth trajectory predicted by the entire dataset.
+
 8. Add to the previous plot the average growth trajectory for all chicks (calculated as the mean weight for each chick at each time). How do the trajectories compare?
 
 	```{r}
 #	ggplot(gextremes, aes(x=Time, y=weight, color=Chick)) + geom_point() + stat_smooth(data=cw, method='lm', aes(x=Time, y=weight), se=F) + facet_wrap(~Chick) + stat_smooth(method='lm', se=F)
-	ggplot(gextremes, aes(x=Time, y=weight, color=Chick)) + geom_point() + geom_smooth(method='lm') + facet_wrap(~Chick) + geom_smooth(data=cw, aes(x = Time, y = weight, colour="red"), method="lm")
+	ggplot(gextremes, aes(x=Time, y=weight)) + geom_point() + geom_smooth(method='lm') + facet_wrap(~filtered_chicks) + geom_smooth(data=cw, aes(x = Time, y = weight, color="red"), method="lm")
 #	plot = plot + stat_smooth(data=cw, method='lm', aes(x=Time, y=weight), se=F)
 
 #	plot
