@@ -42,26 +42,27 @@ For all of the questions use `dplyr` functions with the pipe `%>%` whenever poss
 	```{r}
 	weight_init = cw %>% filter(Time == 0) %>% arrange(Chick)
 	cw = cw %>%
-	     mutate(weightgain = weight - weight_init[Chick, "weight"])
+	     mutate(weightgain = weight - weight_init[Chick, "weight"]) %>%
+	     mutate(weight0 = weight_init$weight[Chick])
 	head(cw, 3)
 	```
 
 5. Use `{ggplot2}` to create side-by-side boxplots of `weightgain` by `Diet` for day 21. Change the order of the categories in the Diet variable such that the boxplots are ordered by median `weightgain`, and the lower limit of the y axis should be 0. Describe the relationship in 2-3 sentences. 
 
 	```{r}
-	medians = cw %>% group_by(Diet) %>% summarize(median = median(weightgain)) %>% arrange(median)
+	medians = cw %>% group_by(Diet) %>% summarize(median = median(weightgain)) %>% arrange(desc(median))
 
 	print(medians)
-	print(levels(factor(c(medians["Diet"]))))
+#	print(levels(factor(c(medians["Diet"]))))
 #	diets = ordered(cw$Diet, levels=c(medians["Diet"]))
 #	print(diets)
 
 #	cw$Diet = reorder(cw$Diet, levels(factor(c(medians["Diet"]))))
 
 	cw %>% 
-	filter(Time == 21) %>%
-	mutate(weightmedian = medians[Diet, "median"]$median) %>%
-	arrange(weightmedian, Chick) %>%
+	filter(Time == 21) %>% mutate(Diet = factor(Diet, levels=c(medians$Diet))) %>%
+#	mutate(weightmedian = medians[Diet, "median"]$median) %>%
+#	arrange(weightmedian, Chick) %>%
 	ggplot(aes(x=Diet, y=weightgain)) + geom_boxplot() + ylim(0, NA)
 	```
 
@@ -103,35 +104,66 @@ For all of the questions use `dplyr` functions with the pipe `%>%` whenever poss
 7. For the chicks with the least and the most weight at time 0, plot their growth trajectories over time.
 
 	```{r}
-	time0 = cw %>% filter(Time == 0)
+	mx = max(weight_init$weight)
+	mn = min(weight_init$weight)
 
-	mx = max(time0$weight)
-	mn = min(time0$weight)
+	extremes = weight_init %>% filter((weight == mx | weight == mn) & (Chick %in% complete$Chick))
 
-	extremes = time0 %>% filter(weight == mx | weight == mn)
+	chicks = unique(extremes$Chick)
 
-	chicks = c(extremes["Chick"]$Chick)
+	gextremes = cw %>% filter(Chick %in% chicks) %>% arrange(Chick) # group_by(Chick) %>% arrange(Chick)
+	print(gextremes)
 
-	extremes = cw %>% filter(Chick %in% chicks) %>% group_by(Chick) %>% arrange(Chick)
+	ggplot(gextremes, aes(x=Time, y=weight, color=Chick)) + geom_point() + facet_wrap(~Chick) + geom_smooth(method='lm')
 
-	plot = ggplot(extremes, aes(x=Time, y=weight, color=Chick)) + geom_point() + facet_wrap(~Chick)
-
-	i = 1
-	repeat {
-
-		chick = chicks[i]
-		extremes = cw %>% filter(Chick == chick)
-		plot = plot + stat_smooth(data=extremes, method='lm', aes(x=Time, y=weight, color=Chick), se=F)
-
-		i = i + 1
-		if(i >= length(chicks)) { break }
-	}
-
-	plot
+#	i = 1
+#	repeat {
+#
+#		chick = chicks[i]
+#		extremes = cw %>% filter(Chick == chick)
+#		plot = plot + stat_smooth(data=extremes, method='lm', aes(x=Time, y=weight, color=Chick), se=F)
+#
+#		i = i + 1
+#		if(i > length(chicks)) { break }
+#	}
 
 	```
 
 8. Add to the previous plot the average growth trajectory for all chicks (calculated as the mean weight for each chick at each time). How do the trajectories compare?
+
+	```{r}
+#	ggplot(gextremes, aes(x=Time, y=weight, color=Chick)) + geom_point() + stat_smooth(data=cw, method='lm', aes(x=Time, y=weight), se=F) + facet_wrap(~Chick) + stat_smooth(method='lm', se=F)
+	ggplot(gextremes, aes(x=Time, y=weight, color=Chick)) + geom_point() + geom_smooth(method='lm') + facet_wrap(~Chick) + geom_smooth(data=cw, aes(x = Time, y = weight, colour="red"), method="lm")
+#	plot = plot + stat_smooth(data=cw, method='lm', aes(x=Time, y=weight), se=F)
+
+#	plot
+	```
+
 9. What else do you find interesting in the dataset? Show your exploratory analysis.
+
+	An interesting question that could be asked is, "Is there a correlation between incomplete data sets, and which diet the chick was eating?" Assuming that an incomplete data line most likely means that the chick died during the experiment, it raises a good question of whether maybe the diet had something to do with it.
+
+	```{r}
+	incomplete = cw %>% filter(!(Chick %in% complete$Chick)) %>% group_by(Diet)
+	ggplot(incomplete, aes(x=Time, y=weight, color=Chick)) + geom_point()
+	```
+
+	After looking at how many chicks don't have complete data, I'm going to guess that this might be a bit of a bad sample, but lets continue anyway; With a bar chart, I can easily see the percentage in each diet.
+
+	```{r}
+	ggplot(incomplete, aes(x=Diet, fill=Chick)) + geom_bar()
+	```
+
+	From this graph, you can see that roughly 80% of the chicks that didn't have complete data entries, were from diet 1, and only one entry was from diet 4, that's actually kind of suspicious, but could have several reasons.
+
+	- Diet 1 kills the chicks more often than any other diet (the obvious one)
+	- The experiment was a linear process meaning that most mistakes would be made early one during initial stages (diet 1)
+	- The experimenters hadn't dealt with chicks before and thus might have killed a few in the beginning from negligence
+	- It was just a bad batch of chicks
+	- It was an illness
+
+	But one other thing to notice here is that three of the chicks are almost completely consecutive, which points to an illness, spreading amongst nearby chicks in the containment area. In fact I'd be confident to say that whatever caused chicks 18, 16, and 15, to not complete their entries was likely the same thing, whether that be a mistake made a by a person, an illness, maybe an animal, who knows.
+
+	This was really cool, I didn't expect to find anything when I looked for the absence of information instead of presence of information.
 
 Note: your submission is supposed to be fully reproducible, i.e. the TA and I will 'knit' your submission in RStudio. 
